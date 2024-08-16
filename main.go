@@ -171,6 +171,33 @@ func handleUser(responseWriter http.ResponseWriter, request *http.Request) {
 	}
 }
 
+func handleClick(responseWriter http.ResponseWriter, request *http.Request) {
+	type RequestBody struct {
+		Uid string `json:"uid"`
+	}
+
+	var requestBody RequestBody
+	err := json.NewDecoder(request.Body).Decode(&requestBody)
+
+	if err != nil {
+		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	_, err = FIRESTORE_CLIENT.Collection("users").Doc(requestBody.Uid).Update(
+		CONTEXT,
+		[]firestore.Update{
+			{
+				Path: "count", Value: firestore.Increment(1),
+			},
+		})
+
+	if err != nil {
+		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
 func main() {
 	CONTEXT = context.Background()
 	initializeFirebase()
@@ -181,6 +208,7 @@ func main() {
 	http.HandleFunc("/ping", handlePing)
 	http.HandleFunc("/signup", handleSignUp)
 	http.HandleFunc("/user", handleUser)
+	http.HandleFunc("/click", handleClick)
 
 	log.Fatalln(http.ListenAndServe(":80", nil))
 }
