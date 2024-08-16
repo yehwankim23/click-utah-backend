@@ -135,6 +135,42 @@ func handleSignUp(responseWriter http.ResponseWriter, request *http.Request) {
 	}
 }
 
+func handleUser(responseWriter http.ResponseWriter, request *http.Request) {
+	type RequestBody struct {
+		Uid string `json:"uid"`
+	}
+
+	var requestBody RequestBody
+	err := json.NewDecoder(request.Body).Decode(&requestBody)
+
+	if err != nil {
+		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	documentSnapshot, err := FIRESTORE_CLIENT.Collection("users").Doc(requestBody.Uid).Get(CONTEXT)
+
+	if err != nil {
+		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	response, err := json.Marshal(documentSnapshot.Data())
+
+	if err != nil {
+		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	responseWriter.Header().Set("Content-Type", "application/json")
+	_, err = responseWriter.Write(response)
+
+	if err != nil {
+		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
 func main() {
 	CONTEXT = context.Background()
 	initializeFirebase()
@@ -144,6 +180,7 @@ func main() {
 
 	http.HandleFunc("/ping", handlePing)
 	http.HandleFunc("/signup", handleSignUp)
+	http.HandleFunc("/user", handleUser)
 
 	log.Fatalln(http.ListenAndServe(":80", nil))
 }
