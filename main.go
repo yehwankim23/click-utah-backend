@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"cloud.google.com/go/firestore"
@@ -82,13 +83,67 @@ func handlePing(responseWriter http.ResponseWriter, request *http.Request) {
 	}
 }
 
+func handleSignUp(responseWriter http.ResponseWriter, request *http.Request) {
+	type RequestBody struct {
+		Email       string `json:"email"`
+		Password    string `json:"password"`
+		DisplayName string `json:"displayName"`
+	}
+
+	var requestBody RequestBody
+	err := json.NewDecoder(request.Body).Decode(&requestBody)
+
+	if err != nil {
+		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if !strings.HasSuffix(requestBody.Email, "utah.edu") {
+		http.Error(responseWriter, "Invalid email", http.StatusBadRequest)
+		return
+	}
+
+	userRecord, err := AUTH_CLIENT.CreateUser(
+		CONTEXT,
+		(&auth.UserToCreate{}).
+			Email(requestBody.Email).
+			Password(requestBody.Password).
+			DisplayName(requestBody.DisplayName),
+	)
+
+	if err != nil {
+		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	uid := userRecord.UID
+
+	_, err = FIRESTORE_CLIENT.Collection("users").Doc(uid).Set(CONTEXT, map[string]int{
+		"count": 0,
+	})
+
+	if err != nil {
+		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
+		err := AUTH_CLIENT.DeleteUser(CONTEXT, uid)
+
+		if err != nil {
+			http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		return
+	}
+}
+
 func main() {
 	CONTEXT = context.Background()
 	initializeFirebase()
 	initializeAuth()
 	initializeFirestore()
+	defer FIRESTORE_CLIENT.Close()
 
 	http.HandleFunc("/ping", handlePing)
+	http.HandleFunc("/signup", handleSignUp)
 
 	log.Fatalln(http.ListenAndServe(":80", nil))
 }
