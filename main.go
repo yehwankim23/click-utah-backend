@@ -57,16 +57,9 @@ func initializeFirestore() {
 	log.Println("Initialized Firestore")
 }
 
-func handlePing(responseWriter http.ResponseWriter, request *http.Request) {
-	location, err := time.LoadLocation("Asia/Seoul")
-
-	if err != nil {
-		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
+func handleTime(responseWriter http.ResponseWriter, request *http.Request) {
 	response, err := json.Marshal(map[string]string{
-		"pong": time.Now().In(location).Format(time.DateTime),
+		"time": time.Now().UTC().Add(time.Hour * 9).Format(time.DateTime),
 	})
 
 	if err != nil {
@@ -205,7 +198,7 @@ func main() {
 	initializeFirestore()
 	defer FIRESTORE_CLIENT.Close()
 
-	http.HandleFunc("/ping", handlePing)
+	http.HandleFunc("/time", handleTime)
 	http.HandleFunc("/signup", handleSignUp)
 	http.HandleFunc("/user", handleUser)
 	http.HandleFunc("/click", handleClick)
