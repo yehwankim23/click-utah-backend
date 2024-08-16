@@ -8,11 +8,13 @@ import (
 	"time"
 
 	firebase "firebase.google.com/go"
+	"firebase.google.com/go/auth"
 	"google.golang.org/api/option"
 )
 
 var CONTEXT context.Context
 var FIREBASE_APP *firebase.App
+var AUTH_CLIENT *auth.Client
 
 func initializeFirebase() {
 	var err error
@@ -28,6 +30,17 @@ func initializeFirebase() {
 	}
 
 	log.Println("Initialized Firebase")
+}
+
+func initializeAuth() {
+	var err error
+	AUTH_CLIENT, err = FIREBASE_APP.Auth(CONTEXT)
+
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	log.Println("Initialized Authentication")
 }
 
 func handlePing(responseWriter http.ResponseWriter, request *http.Request) {
@@ -59,6 +72,7 @@ func handlePing(responseWriter http.ResponseWriter, request *http.Request) {
 func main() {
 	CONTEXT = context.Background()
 	initializeFirebase()
+	initializeAuth()
 
 	http.HandleFunc("/ping", handlePing)
 
