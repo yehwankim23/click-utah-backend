@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"cloud.google.com/go/firestore"
 	firebase "firebase.google.com/go"
 	"firebase.google.com/go/auth"
 	"google.golang.org/api/option"
@@ -15,6 +16,7 @@ import (
 var CONTEXT context.Context
 var FIREBASE_APP *firebase.App
 var AUTH_CLIENT *auth.Client
+var FIRESTORE_CLIENT *firestore.Client
 
 func initializeFirebase() {
 	var err error
@@ -41,6 +43,17 @@ func initializeAuth() {
 	}
 
 	log.Println("Initialized Authentication")
+}
+
+func initializeFirestore() {
+	var err error
+	FIRESTORE_CLIENT, err = FIREBASE_APP.Firestore(CONTEXT)
+
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	log.Println("Initialized Firestore")
 }
 
 func handlePing(responseWriter http.ResponseWriter, request *http.Request) {
@@ -73,6 +86,7 @@ func main() {
 	CONTEXT = context.Background()
 	initializeFirebase()
 	initializeAuth()
+	initializeFirestore()
 
 	http.HandleFunc("/ping", handlePing)
 
