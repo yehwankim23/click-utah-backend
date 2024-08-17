@@ -5,25 +5,47 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
-	"cloud.google.com/go/firestore"
 	firebase "firebase.google.com/go"
 	"firebase.google.com/go/auth"
 	"google.golang.org/api/option"
 )
 
-var CONTEXT context.Context
-var FIREBASE_APP *firebase.App
-var AUTH_CLIENT *auth.Client
-var FIRESTORE_CLIENT *firestore.Client
+var Context context.Context
+var AuthClient *auth.Client
 
-func initializeFirebase() {
+type TimeInfo struct {
+	Time string `json:"time"`
+}
+
+type SignUpInfo struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+	Name     string `json:"name"`
+}
+
+type UserInfo struct {
+	Name  string `json:"name"`
+	Count int    `json:"count"`
+}
+
+type UIDInfo struct {
+	UID string `json:"uid"`
+}
+
+type CountInfo struct {
+	Count int `json:"count"`
+}
+
+func initializeFirebaseAuth() {
+	Context = context.Background()
 	var err error
 
-	FIREBASE_APP, err = firebase.NewApp(
-		CONTEXT,
+	firebaseApp, err := firebase.NewApp(
+		Context,
 		nil,
 		option.WithCredentialsFile("click-utah-d7eaac9e6640.json"),
 	)
@@ -32,34 +54,18 @@ func initializeFirebase() {
 		log.Fatalln(err)
 	}
 
-	log.Println("Initialized Firebase")
-}
-
-func initializeAuth() {
-	var err error
-	AUTH_CLIENT, err = FIREBASE_APP.Auth(CONTEXT)
+	AuthClient, err = firebaseApp.Auth(Context)
 
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	log.Println("Initialized Authentication")
-}
-
-func initializeFirestore() {
-	var err error
-	FIRESTORE_CLIENT, err = FIREBASE_APP.Firestore(CONTEXT)
-
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	log.Println("Initialized Firestore")
+	log.Println("Initialized Firebase Auth")
 }
 
 func handleTime(responseWriter http.ResponseWriter, request *http.Request) {
-	response, err := json.Marshal(map[string]string{
-		"time": time.Now().UTC().Add(time.Hour * 9).Format(time.DateTime),
+	timeBytes, err := json.Marshal(TimeInfo{
+		Time: time.Now().UTC().Add(time.Hour * 9).Format(time.DateTime),
 	})
 
 	if err != nil {
@@ -68,7 +74,7 @@ func handleTime(responseWriter http.ResponseWriter, request *http.Request) {
 	}
 
 	responseWriter.Header().Set("Content-Type", "application/json")
-	_, err = responseWriter.Write(response)
+	_, err = responseWriter.Write(timeBytes)
 
 	if err != nil {
 		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
@@ -77,31 +83,22 @@ func handleTime(responseWriter http.ResponseWriter, request *http.Request) {
 }
 
 func handleSignUp(responseWriter http.ResponseWriter, request *http.Request) {
-	type RequestBody struct {
-		Email       string `json:"email"`
-		Password    string `json:"password"`
-		DisplayName string `json:"displayName"`
-	}
-
-	var requestBody RequestBody
-	err := json.NewDecoder(request.Body).Decode(&requestBody)
+	var signUpInfo SignUpInfo
+	err := json.NewDecoder(request.Body).Decode(&signUpInfo)
 
 	if err != nil {
-		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
+		http.Error(responseWriter, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	if !strings.HasSuffix(requestBody.Email, "utah.edu") {
+	if !strings.HasSuffix(signUpInfo.Email, "utah.edu") {
 		http.Error(responseWriter, "Invalid email", http.StatusBadRequest)
 		return
 	}
 
-	userRecord, err := AUTH_CLIENT.CreateUser(
-		CONTEXT,
-		(&auth.UserToCreate{}).
-			Email(requestBody.Email).
-			Password(requestBody.Password).
-			DisplayName(requestBody.DisplayName),
+	userRecord, err := AuthClient.CreateUser(
+		Context,
+		(&auth.UserToCreate{}).Email(signUpInfo.Email).Password(signUpInfo.Password),
 	)
 
 	if err != nil {
@@ -109,54 +106,57 @@ func handleSignUp(responseWriter http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	uid := userRecord.UID
-
-	_, err = FIRESTORE_CLIENT.Collection("users").Doc(uid).Set(CONTEXT, map[string]int{
-		"count": 0,
+	userBytes, err := json.Marshal(UserInfo{
+		Name:  signUpInfo.Name,
+		Count: 0,
 	})
 
 	if err != nil {
 		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
-		err := AUTH_CLIENT.DeleteUser(CONTEXT, uid)
+		return
+	}
 
-		if err != nil {
+	uid := userRecord.UID
+	err = os.WriteFile("./data/"+uid+".json", userBytes, 0600)
+
+	uidBytes, err := json.Marshal(UIDInfo{
+		UID: uid,
+	})
+
+	responseWriter.Header().Set("Content-Type", "application/json")
+	_, err = responseWriter.Write(uidBytes)
+
+	if err != nil {
+		innerErr := AuthClient.DeleteUser(Context, uid)
+
+		if innerErr != nil {
 			http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
+		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
 		return
 	}
 }
 
 func handleUser(responseWriter http.ResponseWriter, request *http.Request) {
-	type RequestBody struct {
-		Uid string `json:"uid"`
-	}
-
-	var requestBody RequestBody
-	err := json.NewDecoder(request.Body).Decode(&requestBody)
+	var uidInfo UIDInfo
+	err := json.NewDecoder(request.Body).Decode(&uidInfo)
 
 	if err != nil {
-		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
+		http.Error(responseWriter, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	documentSnapshot, err := FIRESTORE_CLIENT.Collection("users").Doc(requestBody.Uid).Get(CONTEXT)
+	dataBytes, err := os.ReadFile("./data/" + uidInfo.UID + ".json")
 
 	if err != nil {
-		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	response, err := json.Marshal(documentSnapshot.Data())
-
-	if err != nil {
-		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
+		http.Error(responseWriter, "Invalid uid", http.StatusBadRequest)
 		return
 	}
 
 	responseWriter.Header().Set("Content-Type", "application/json")
-	_, err = responseWriter.Write(response)
+	_, err = responseWriter.Write(dataBytes)
 
 	if err != nil {
 		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
@@ -165,25 +165,55 @@ func handleUser(responseWriter http.ResponseWriter, request *http.Request) {
 }
 
 func handleClick(responseWriter http.ResponseWriter, request *http.Request) {
-	type RequestBody struct {
-		Uid string `json:"uid"`
+	var uidInfo UIDInfo
+	err := json.NewDecoder(request.Body).Decode(&uidInfo)
+
+	if err != nil {
+		http.Error(responseWriter, err.Error(), http.StatusBadRequest)
+		return
 	}
 
-	var requestBody RequestBody
-	err := json.NewDecoder(request.Body).Decode(&requestBody)
+	userBytes, err := os.ReadFile("./data/" + uidInfo.UID + ".json")
+
+	if err != nil {
+		http.Error(responseWriter, "Invalid uid", http.StatusBadRequest)
+		return
+	}
+
+	var userInfo UserInfo
+	err = json.Unmarshal(userBytes, &userInfo)
 
 	if err != nil {
 		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	_, err = FIRESTORE_CLIENT.Collection("users").Doc(requestBody.Uid).Update(
-		CONTEXT,
-		[]firestore.Update{
-			{
-				Path: "count", Value: firestore.Increment(1),
-			},
-		})
+	userInfo.Count++
+	userBytes, err = json.Marshal(userInfo)
+
+	if err != nil {
+		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	err = os.WriteFile("./data/"+uidInfo.UID+".json", userBytes, 0600)
+
+	if err != nil {
+		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	countBytes, err := json.Marshal(CountInfo{
+		Count: userInfo.Count,
+	})
+
+	if err != nil {
+		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	responseWriter.Header().Set("Content-Type", "application/json")
+	_, err = responseWriter.Write(countBytes)
 
 	if err != nil {
 		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
@@ -192,11 +222,7 @@ func handleClick(responseWriter http.ResponseWriter, request *http.Request) {
 }
 
 func main() {
-	CONTEXT = context.Background()
-	initializeFirebase()
-	initializeAuth()
-	initializeFirestore()
-	defer FIRESTORE_CLIENT.Close()
+	initializeFirebaseAuth()
 
 	http.HandleFunc("/time", handleTime)
 	http.HandleFunc("/signup", handleSignUp)
