@@ -27,6 +27,22 @@ type SignUpInfo struct {
 	Name     string `json:"name"`
 }
 
+type FirebaseInfo struct {
+	Error FirebaseError `json:"error"`
+}
+
+type FirebaseError struct {
+	Code    int              `json:"code"`
+	Message string           `json:"message"`
+	Errors  []FirebaseErrors `json:"errors"`
+}
+
+type FirebaseErrors struct {
+	Message string `json:"message"`
+	Domain  string `json:"domain"`
+	Reason  string `json:"reason"`
+}
+
 type UserInfo struct {
 	Name  string `json:"name"`
 	Count int    `json:"count"`
@@ -91,23 +107,48 @@ func handleSignUp(responseWriter http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	if !strings.HasSuffix(signUpInfo.Email, "utah.edu") {
-		http.Error(responseWriter, "Invalid email", http.StatusBadRequest)
+	email := signUpInfo.Email
+	password := signUpInfo.Password
+	name := signUpInfo.Name
+
+	if email == "" || password == "" || name == "" {
+		http.Error(responseWriter, "Missing email, password, and/or name", http.StatusBadRequest)
+		return
+	}
+
+	if !strings.HasSuffix(email, "utah.edu") {
+		http.Error(responseWriter, "Invalid email domain", http.StatusBadRequest)
 		return
 	}
 
 	userRecord, err := AuthClient.CreateUser(
 		Context,
-		(&auth.UserToCreate{}).Email(signUpInfo.Email).Password(signUpInfo.Password),
+		(&auth.UserToCreate{}).Email(email).Password(password),
 	)
 
 	if err != nil {
-		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
+		errString := err.Error()
+		_, after, found := strings.Cut(errString, "body: ")
+
+		if !found {
+			http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		var firebaseInfo FirebaseInfo
+		err := json.Unmarshal([]byte(after), &firebaseInfo)
+
+		if err != nil {
+			http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
+		}
+
+		firebaseError := firebaseInfo.Error
+		http.Error(responseWriter, firebaseError.Message, firebaseError.Code)
 		return
 	}
 
 	userBytes, err := json.Marshal(UserInfo{
-		Name:  signUpInfo.Name,
+		Name:  name,
 		Count: 0,
 	})
 
@@ -119,9 +160,19 @@ func handleSignUp(responseWriter http.ResponseWriter, request *http.Request) {
 	uid := userRecord.UID
 	err = os.WriteFile("./data/"+uid+".json", userBytes, 0600)
 
+	if err != nil {
+		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	uidBytes, err := json.Marshal(UIDInfo{
 		UID: uid,
 	})
+
+	if err != nil {
+		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	responseWriter.Header().Set("Content-Type", "application/json")
 	_, err = responseWriter.Write(uidBytes)
@@ -130,7 +181,23 @@ func handleSignUp(responseWriter http.ResponseWriter, request *http.Request) {
 		innerErr := AuthClient.DeleteUser(Context, uid)
 
 		if innerErr != nil {
-			http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
+			errString := innerErr.Error()
+			_, after, found := strings.Cut(errString, "body: ")
+
+			if !found {
+				http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			var firebaseInfo FirebaseInfo
+			err := json.Unmarshal([]byte(after), &firebaseInfo)
+
+			if err != nil {
+				http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
+			}
+
+			firebaseError := firebaseInfo.Error
+			http.Error(responseWriter, firebaseError.Message, firebaseError.Code)
 			return
 		}
 
@@ -148,10 +215,17 @@ func handleUser(responseWriter http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	dataBytes, err := os.ReadFile("./data/" + uidInfo.UID + ".json")
+	uid := uidInfo.UID
+
+	if uid == "" {
+		http.Error(responseWriter, "Missing UID", http.StatusBadRequest)
+		return
+	}
+
+	dataBytes, err := os.ReadFile("./data/" + uid + ".json")
 
 	if err != nil {
-		http.Error(responseWriter, "Invalid uid", http.StatusBadRequest)
+		http.Error(responseWriter, "Invalid UID", http.StatusBadRequest)
 		return
 	}
 
@@ -173,10 +247,17 @@ func handleClick(responseWriter http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	userBytes, err := os.ReadFile("./data/" + uidInfo.UID + ".json")
+	uid := uidInfo.UID
+
+	if uid == "" {
+		http.Error(responseWriter, "Missing UID", http.StatusBadRequest)
+		return
+	}
+
+	userBytes, err := os.ReadFile("./data/" + uid + ".json")
 
 	if err != nil {
-		http.Error(responseWriter, "Invalid uid", http.StatusBadRequest)
+		http.Error(responseWriter, "Invalid UID", http.StatusBadRequest)
 		return
 	}
 
@@ -196,7 +277,7 @@ func handleClick(responseWriter http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	err = os.WriteFile("./data/"+uidInfo.UID+".json", userBytes, 0600)
+	err = os.WriteFile("./data/"+uid+".json", userBytes, 0600)
 
 	if err != nil {
 		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
