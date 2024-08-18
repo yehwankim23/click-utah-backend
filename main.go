@@ -56,6 +56,15 @@ type CountInfo struct {
 	Count int `json:"count"`
 }
 
+type RenameInfo struct {
+	UID  string `json:"uid"`
+	Name string `json:"name"`
+}
+
+type NameInfo struct {
+	Name string `json:"name"`
+}
+
 func initializeFirebaseAuth() {
 	Context = context.Background()
 	var err error
@@ -302,6 +311,71 @@ func handleClick(responseWriter http.ResponseWriter, request *http.Request) {
 	}
 }
 
+func handleRename(responseWriter http.ResponseWriter, request *http.Request) {
+	var renameInfo RenameInfo
+	err := json.NewDecoder(request.Body).Decode(&renameInfo)
+
+	if err != nil {
+		http.Error(responseWriter, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	uid := renameInfo.UID
+	name := renameInfo.Name
+
+	if uid == "" || name == "" {
+		http.Error(responseWriter, "Missing UID and/or name", http.StatusBadRequest)
+		return
+	}
+
+	userBytes, err := os.ReadFile("./data/" + uid + ".json")
+
+	if err != nil {
+		http.Error(responseWriter, "Invalid UID", http.StatusBadRequest)
+		return
+	}
+
+	var userInfo UserInfo
+	err = json.Unmarshal(userBytes, &userInfo)
+
+	if err != nil {
+		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	userInfo.Name = name
+	userBytes, err = json.Marshal(userInfo)
+
+	if err != nil {
+		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	err = os.WriteFile("./data/"+uid+".json", userBytes, 0600)
+
+	if err != nil {
+		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	nameBytes, err := json.Marshal(NameInfo{
+		Name: name,
+	})
+
+	if err != nil {
+		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	responseWriter.Header().Set("Content-Type", "application/json")
+	_, err = responseWriter.Write(nameBytes)
+
+	if err != nil {
+		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
 func main() {
 	initializeFirebaseAuth()
 
@@ -309,6 +383,7 @@ func main() {
 	http.HandleFunc("/signup", handleSignUp)
 	http.HandleFunc("/user", handleUser)
 	http.HandleFunc("/click", handleClick)
+	http.HandleFunc("/rename", handleRename)
 
 	log.Fatalln(http.ListenAndServe(":80", nil))
 }
