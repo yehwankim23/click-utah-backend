@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	firebase "firebase.google.com/go"
@@ -16,6 +17,8 @@ import (
 
 var Context context.Context
 var AuthClient *auth.Client
+
+var Mutexes = make(map[string]*sync.Mutex)
 
 type TimeInfo struct {
 	Time string `json:"time"`
@@ -63,6 +66,18 @@ type RenameInfo struct {
 
 type NameInfo struct {
 	Name string `json:"name"`
+}
+
+func getMutex(fileName string) *sync.Mutex {
+	mutex, exists := Mutexes[fileName]
+
+	if exists {
+		return mutex
+	}
+
+	mutex = &sync.Mutex{}
+	Mutexes[fileName] = mutex
+	return mutex
 }
 
 func initializeFirebaseAuth() {
@@ -167,7 +182,11 @@ func handleSignUp(responseWriter http.ResponseWriter, request *http.Request) {
 	}
 
 	uid := userRecord.UID
-	err = os.WriteFile("./data/"+uid+".json", userBytes, 0600)
+	fileName := "./data/" + uid + ".json"
+	mutex := getMutex(fileName)
+	mutex.Lock()
+	defer mutex.Unlock()
+	err = os.WriteFile(fileName, userBytes, 0600)
 
 	if err != nil {
 		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
@@ -231,7 +250,11 @@ func handleUser(responseWriter http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	dataBytes, err := os.ReadFile("./data/" + uid + ".json")
+	fileName := "./data/" + uid + ".json"
+	mutex := getMutex(fileName)
+	mutex.Lock()
+	defer mutex.Unlock()
+	dataBytes, err := os.ReadFile(fileName)
 
 	if err != nil {
 		http.Error(responseWriter, "Invalid UID", http.StatusBadRequest)
@@ -263,7 +286,11 @@ func handleClick(responseWriter http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	userBytes, err := os.ReadFile("./data/" + uid + ".json")
+	fileName := "./data/" + uid + ".json"
+	mutex := getMutex(fileName)
+	mutex.Lock()
+	defer mutex.Unlock()
+	userBytes, err := os.ReadFile(fileName)
 
 	if err != nil {
 		http.Error(responseWriter, "Invalid UID", http.StatusBadRequest)
@@ -286,7 +313,7 @@ func handleClick(responseWriter http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	err = os.WriteFile("./data/"+uid+".json", userBytes, 0600)
+	err = os.WriteFile(fileName, userBytes, 0600)
 
 	if err != nil {
 		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
@@ -328,7 +355,11 @@ func handleRename(responseWriter http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	userBytes, err := os.ReadFile("./data/" + uid + ".json")
+	fileName := "./data/" + uid + ".json"
+	mutex := getMutex(fileName)
+	mutex.Lock()
+	defer mutex.Unlock()
+	userBytes, err := os.ReadFile(fileName)
 
 	if err != nil {
 		http.Error(responseWriter, "Invalid UID", http.StatusBadRequest)
@@ -351,7 +382,7 @@ func handleRename(responseWriter http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	err = os.WriteFile("./data/"+uid+".json", userBytes, 0600)
+	err = os.WriteFile(fileName, userBytes, 0600)
 
 	if err != nil {
 		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
