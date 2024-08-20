@@ -47,8 +47,9 @@ type FirebaseErrors struct {
 }
 
 type UserInfo struct {
-	Name  string `json:"name"`
-	Count int    `json:"count"`
+	Name      string `json:"name"`
+	Count     int    `json:"count"`
+	Timestamp int64  `json:"timestamp"`
 }
 
 type UIDInfo struct {
@@ -172,8 +173,9 @@ func handleSignUp(responseWriter http.ResponseWriter, request *http.Request) {
 	}
 
 	userBytes, err := json.Marshal(UserInfo{
-		Name:  name,
-		Count: 0,
+		Name:      name,
+		Count:     0,
+		Timestamp: time.Now().UnixMicro(),
 	})
 
 	if err != nil {
@@ -306,6 +308,7 @@ func handleClick(responseWriter http.ResponseWriter, request *http.Request) {
 	}
 
 	userInfo.Count++
+	userInfo.Timestamp = time.Now().UnixMicro()
 	userBytes, err = json.Marshal(userInfo)
 
 	if err != nil {
