@@ -114,7 +114,8 @@ func handleTime(responseWriter http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	responseWriter.Header().Set("Content-Type", "application/json")
+	responseWriter.Header().Add("Access-Control-Allow-Origin", "*")
+	responseWriter.Header().Add("Content-Type", "application/json")
 	_, err = responseWriter.Write(timeBytes)
 
 	if err != nil {
@@ -204,7 +205,8 @@ func handleSignUp(responseWriter http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	responseWriter.Header().Set("Content-Type", "application/json")
+	responseWriter.Header().Add("Access-Control-Allow-Origin", "*")
+	responseWriter.Header().Add("Content-Type", "application/json")
 	_, err = responseWriter.Write(uidBytes)
 
 	if err != nil {
@@ -256,15 +258,16 @@ func handleUser(responseWriter http.ResponseWriter, request *http.Request) {
 	mutex := getMutex(fileName)
 	mutex.Lock()
 	defer mutex.Unlock()
-	dataBytes, err := os.ReadFile(fileName)
+	userBytes, err := os.ReadFile(fileName)
 
 	if err != nil {
 		http.Error(responseWriter, "Invalid UID", http.StatusBadRequest)
 		return
 	}
 
-	responseWriter.Header().Set("Content-Type", "application/json")
-	_, err = responseWriter.Write(dataBytes)
+	responseWriter.Header().Add("Access-Control-Allow-Origin", "*")
+	responseWriter.Header().Add("Content-Type", "application/json")
+	_, err = responseWriter.Write(userBytes)
 
 	if err != nil {
 		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
@@ -332,7 +335,8 @@ func handleClick(responseWriter http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	responseWriter.Header().Set("Content-Type", "application/json")
+	responseWriter.Header().Add("Access-Control-Allow-Origin", "*")
+	responseWriter.Header().Add("Content-Type", "application/json")
 	_, err = responseWriter.Write(countBytes)
 
 	if err != nil {
@@ -401,7 +405,8 @@ func handleRename(responseWriter http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	responseWriter.Header().Set("Content-Type", "application/json")
+	responseWriter.Header().Add("Access-Control-Allow-Origin", "*")
+	responseWriter.Header().Add("Content-Type", "application/json")
 	_, err = responseWriter.Write(nameBytes)
 
 	if err != nil {
