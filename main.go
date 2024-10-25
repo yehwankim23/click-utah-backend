@@ -13,7 +13,8 @@ import (
 var Mutexes = make(map[string]*sync.Mutex)
 
 type TimeJson struct {
-	Time string `json:"time"`
+	Time    string `json:"time"`
+	Version string `json:"version"`
 }
 
 type ErrorJson struct {
@@ -103,7 +104,8 @@ func handleTime(responseWriter http.ResponseWriter, request *http.Request) {
 	function := "handleTime"
 
 	timeBytes, err := json.Marshal(TimeJson{
-		Time: time.Now().UTC().Add(time.Hour * 9).Format(time.DateTime),
+		Time:    time.Now().UTC().Add(time.Hour * 9).Format(time.DateTime),
+		Version: "2024.10.25.0",
 	})
 
 	if err != nil {
