@@ -60,7 +60,7 @@ type RenameJson struct {
 }
 
 func logError(level string, function string, code string, message string) {
-	log.Println(level + " " + function + " " + code + " " + message)
+	log.Printf("%s %-20s %-50s %s\n", level, function, code, message)
 }
 
 func handleError(responseWriter http.ResponseWriter, level string, function string, code string,
@@ -105,7 +105,7 @@ func handleTime(responseWriter http.ResponseWriter, request *http.Request) {
 
 	timeBytes, err := json.Marshal(TimeJson{
 		Time:    time.Now().UTC().Add(time.Hour * 9).Format(time.DateTime),
-		Version: "2024.10.25.0",
+		Version: "2024.10.25.1",
 	})
 
 	if err != nil {
@@ -553,6 +553,6 @@ func main() {
 	http.HandleFunc("/rename", handleRename)
 	http.HandleFunc("/click", handleClick)
 
-	log.Println("Listening on port 80")
+	logError("2", "main", "", "")
 	log.Fatalln(http.ListenAndServe(":80", nil))
 }
