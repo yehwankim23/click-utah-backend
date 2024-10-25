@@ -1,25 +1,41 @@
 package main
 
 import (
+	"cmp"
 	"encoding/json"
 	"log"
 	"net/http"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"time"
 )
 
 var Mutexes = make(map[string]*sync.Mutex)
-
-type TimeJson struct {
-	Time    string `json:"time"`
-	Version string `json:"version"`
-}
+var leaderboard []LeaderboardItemJson
 
 type ErrorJson struct {
 	Error   bool   `json:"error"`
 	Message string `json:"message"`
+}
+
+type LeaderboardJson struct {
+	Error       bool                  `json:"error"`
+	Leaderboard []LeaderboardItemJson `json:"leaderboard"`
+}
+
+type LeaderboardItemJson struct {
+	Email     string `json:"email"`
+	Name      string `json:"name"`
+	Uid       string `json:"uid"`
+	Count     int    `json:"count"`
+	Timestamp int64  `json:"timestamp"`
+}
+
+type TimeJson struct {
+	Time    string `json:"time"`
+	Version string `json:"version"`
 }
 
 type SignUpJson struct {
@@ -60,18 +76,11 @@ type RenameJson struct {
 }
 
 func logError(level string, function string, code string, message string) {
-	log.Printf("%s %-20s %-50s %s\n", level, function, code, message)
+	log.Printf("%-4s %-24s %-48s %s\n", level, function, code, message)
 }
 
 func handleError(responseWriter http.ResponseWriter, level string, function string, code string,
 	message string) {
-	if level == "" || function == "" || (level != "2" && code == "") {
-		logError("5", "sendError", "level == '' || function == '' || (level != '2' && code == '')",
-			"")
-
-		return
-	}
-
 	logError(level, function, code, message)
 
 	if level != "4" {
@@ -100,12 +109,92 @@ func handleError(responseWriter http.ResponseWriter, level string, function stri
 	logError("2", "sendError", "", "")
 }
 
+func getMutex(fileName string) *sync.Mutex {
+	mutex, exists := Mutexes[fileName]
+
+	if exists {
+		return mutex
+	}
+
+	mutex = &sync.Mutex{}
+	Mutexes[fileName] = mutex
+	return mutex
+}
+
+func updateLeaderboard(leaderboardItemJson LeaderboardItemJson) {
+	mutex := getMutex("leaderboard")
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	leaderboard = slices.DeleteFunc(leaderboard, func(item LeaderboardItemJson) bool {
+		return strings.Compare(item.Uid, leaderboardItemJson.Uid) == 0
+	})
+
+	leaderboard = append(leaderboard, leaderboardItemJson)
+
+	slices.SortFunc(leaderboard, func(a, b LeaderboardItemJson) int {
+		if difference := cmp.Compare(b.Count, a.Count); difference != 0 {
+			return difference
+		}
+
+		return cmp.Compare(a.Timestamp, b.Timestamp)
+	})
+
+	if len(leaderboard) == 11 {
+		leaderboard = leaderboard[:10]
+	}
+}
+
+func initializeLeaderboard() {
+	entries, err := os.ReadDir("./data")
+
+	if err != nil {
+		logError("5", "initializeLeaderboard", "ReadDir('./data')", err.Error())
+		os.Exit(1)
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+
+		fileName := "./data/" + entry.Name()
+		mutex := getMutex(fileName)
+		mutex.Lock()
+		defer mutex.Unlock()
+		dataBytes, err := os.ReadFile(fileName)
+
+		if err != nil {
+			logError("5", "initializeLeaderboard", "ReadFile(fileName)", err.Error())
+			os.Exit(1)
+		}
+
+		var dataJson DataJson
+		err = json.Unmarshal(dataBytes, &dataJson)
+
+		if err != nil {
+			logError("5", "initializeLeaderboard", "Unmarshal(dataBytes, &dataJson)", err.Error())
+			os.Exit(1)
+		}
+
+		updateLeaderboard(LeaderboardItemJson{
+			Email:     dataJson.Email,
+			Name:      dataJson.Name,
+			Uid:       dataJson.Uid,
+			Count:     dataJson.Count,
+			Timestamp: dataJson.Timestamp,
+		})
+	}
+
+	logError("2", "initializeLeaderboard", "", "")
+}
+
 func handleTime(responseWriter http.ResponseWriter, request *http.Request) {
 	function := "handleTime"
 
 	timeBytes, err := json.Marshal(TimeJson{
 		Time:    time.Now().UTC().Add(time.Hour * 9).Format(time.DateTime),
-		Version: "2024.10.25.1",
+		Version: "2024.10.25.2",
 	})
 
 	if err != nil {
@@ -123,18 +212,6 @@ func handleTime(responseWriter http.ResponseWriter, request *http.Request) {
 	}
 
 	handleError(responseWriter, "2", function, "", "")
-}
-
-func getMutex(fileName string) *sync.Mutex {
-	mutex, exists := Mutexes[fileName]
-
-	if exists {
-		return mutex
-	}
-
-	mutex = &sync.Mutex{}
-	Mutexes[fileName] = mutex
-	return mutex
 }
 
 func handleSignUp(responseWriter http.ResponseWriter, request *http.Request) {
@@ -219,6 +296,14 @@ func handleSignUp(responseWriter http.ResponseWriter, request *http.Request) {
 		handleError(responseWriter, "5", function, "Marshal(UserJson)", "")
 		return
 	}
+
+	updateLeaderboard(LeaderboardItemJson{
+		Email:     dataJson.Email,
+		Name:      dataJson.Name,
+		Uid:       dataJson.Uid,
+		Count:     dataJson.Count,
+		Timestamp: dataJson.Timestamp,
+	})
 
 	responseWriter.Header().Add("Access-Control-Allow-Origin", "*")
 	responseWriter.Header().Add("Content-Type", "application/json")
@@ -455,6 +540,14 @@ func handleRename(responseWriter http.ResponseWriter, request *http.Request) {
 		return
 	}
 
+	updateLeaderboard(LeaderboardItemJson{
+		Email:     dataJson.Email,
+		Name:      dataJson.Name,
+		Uid:       dataJson.Uid,
+		Count:     dataJson.Count,
+		Timestamp: dataJson.Timestamp,
+	})
+
 	responseWriter.Header().Add("Access-Control-Allow-Origin", "*")
 	responseWriter.Header().Add("Content-Type", "application/json")
 	_, err = responseWriter.Write(userBytes)
@@ -533,6 +626,14 @@ func handleClick(responseWriter http.ResponseWriter, request *http.Request) {
 		return
 	}
 
+	updateLeaderboard(LeaderboardItemJson{
+		Email:     dataJson.Email,
+		Name:      dataJson.Name,
+		Uid:       dataJson.Uid,
+		Count:     dataJson.Count,
+		Timestamp: dataJson.Timestamp,
+	})
+
 	responseWriter.Header().Add("Access-Control-Allow-Origin", "*")
 	responseWriter.Header().Add("Content-Type", "application/json")
 	_, err = responseWriter.Write(userBytes)
@@ -545,13 +646,45 @@ func handleClick(responseWriter http.ResponseWriter, request *http.Request) {
 	handleError(responseWriter, "2", function, "", "")
 }
 
+func handleLeaderboard(responseWriter http.ResponseWriter, request *http.Request) {
+	function := "handleLeaderboard"
+
+	mutex := getMutex("leaderboard")
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	leaderboardBytes, err := json.Marshal(LeaderboardJson{
+		Error:       false,
+		Leaderboard: leaderboard,
+	})
+
+	if err != nil {
+		handleError(responseWriter, "5", function, "Marshal(LeaderboardJson)", "")
+		return
+	}
+
+	responseWriter.Header().Add("Access-Control-Allow-Origin", "*")
+	responseWriter.Header().Add("Content-Type", "application/json")
+	_, err = responseWriter.Write(leaderboardBytes)
+
+	if err != nil {
+		handleError(responseWriter, "5", function, "Write(leaderboardBytes)", "")
+		return
+	}
+
+	handleError(responseWriter, "2", function, "", "")
+}
+
 func main() {
+	initializeLeaderboard()
+
 	http.HandleFunc("/time", handleTime)
 	http.HandleFunc("/signup", handleSignUp)
 	http.HandleFunc("/signin", handleSignIn)
 	http.HandleFunc("/user", handleUser)
 	http.HandleFunc("/rename", handleRename)
 	http.HandleFunc("/click", handleClick)
+	http.HandleFunc("/leaderboard", handleLeaderboard)
 
 	logError("2", "main", "", "")
 	log.Fatalln(http.ListenAndServe(":80", nil))

@@ -91,6 +91,22 @@ Response
 - `string` uid : UID
 - `number` count : Click count
 
+### /leaderboard
+
+Request body
+
+- `none`
+
+Response
+
+- `boolean` error : Error flag
+- `array` leaderboard
+  - `string` email : Email
+  - `string` name : Name
+  - `string` uid : UID
+  - `number` count : Click count
+  - `number` timestamp : Timestamp
+
 ## Error Flag
 
 Response when error flag is `true`
