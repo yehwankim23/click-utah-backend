@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -9,64 +8,119 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	firebase "firebase.google.com/go"
-	"firebase.google.com/go/auth"
-	"google.golang.org/api/option"
 )
-
-var Context context.Context
-var AuthClient *auth.Client
 
 var Mutexes = make(map[string]*sync.Mutex)
 
-type TimeInfo struct {
+type TimeJson struct {
 	Time string `json:"time"`
 }
 
-type SignUpInfo struct {
+type ErrorJson struct {
+	Error   bool   `json:"error"`
+	Message string `json:"message"`
+}
+
+type SignUpJson struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
 	Name     string `json:"name"`
 }
 
-type FirebaseInfo struct {
-	Error FirebaseError `json:"error"`
-}
-
-type FirebaseError struct {
-	Code    int              `json:"code"`
-	Message string           `json:"message"`
-	Errors  []FirebaseErrors `json:"errors"`
-}
-
-type FirebaseErrors struct {
-	Message string `json:"message"`
-	Domain  string `json:"domain"`
-	Reason  string `json:"reason"`
-}
-
-type UserInfo struct {
+type DataJson struct {
+	Email     string `json:"email"`
+	Password  string `json:"password"`
 	Name      string `json:"name"`
+	Uid       string `json:"uid"`
 	Count     int    `json:"count"`
 	Timestamp int64  `json:"timestamp"`
 }
 
-type UIDInfo struct {
-	UID string `json:"uid"`
+type UidJson struct {
+	Uid string `json:"uid"`
 }
 
-type CountInfo struct {
-	Count int `json:"count"`
+type SignInJson struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
 }
 
-type RenameInfo struct {
-	UID  string `json:"uid"`
+type UserJson struct {
+	Error bool   `json:"error"`
+	Email string `json:"email"`
+	Name  string `json:"name"`
+	Uid   string `json:"uid"`
+	Count int    `json:"count"`
+}
+
+type RenameJson struct {
+	Uid  string `json:"uid"`
 	Name string `json:"name"`
 }
 
-type NameInfo struct {
-	Name string `json:"name"`
+func logError(level string, function string, code string, message string) {
+	log.Println(level + " " + function + " " + code + " " + message)
+}
+
+func handleError(responseWriter http.ResponseWriter, level string, function string, code string,
+	message string) {
+	if level == "" || function == "" || (level != "2" && code == "") {
+		logError("5", "sendError", "level == '' || function == '' || (level != '2' && code == '')",
+			"")
+
+		return
+	}
+
+	logError(level, function, code, message)
+
+	if level != "4" {
+		return
+	}
+
+	errorBytes, err := json.Marshal(ErrorJson{
+		Error:   true,
+		Message: message,
+	})
+
+	if err != nil {
+		logError("5", "sendError", "Marshal(ErrorJson)", "")
+		return
+	}
+
+	responseWriter.Header().Add("Access-Control-Allow-Origin", "*")
+	responseWriter.Header().Add("Content-Type", "application/json")
+	_, err = responseWriter.Write(errorBytes)
+
+	if err != nil {
+		logError("5", "sendError", "Write(errorBytes)", "")
+		return
+	}
+
+	logError("2", "sendError", "", "")
+}
+
+func handleTime(responseWriter http.ResponseWriter, request *http.Request) {
+	function := "handleTime"
+
+	timeBytes, err := json.Marshal(TimeJson{
+		Time: time.Now().UTC().Add(time.Hour * 9).Format(time.DateTime),
+	})
+
+	if err != nil {
+		handleError(responseWriter, "5", function, "Marshal(TimeJson)", "")
+		return
+	}
+
+	responseWriter.Header().Add("Access-Control-Allow-Origin", "*")
+	responseWriter.Header().Add("Content-Type", "application/json")
+	_, err = responseWriter.Write(timeBytes)
+
+	if err != nil {
+		handleError(responseWriter, "5", function, "Write(timeBytes)", "")
+		return
+	}
+
+	handleError(responseWriter, "2", function, "", "")
 }
 
 func getMutex(fileName string) *sync.Mutex {
@@ -81,187 +135,86 @@ func getMutex(fileName string) *sync.Mutex {
 	return mutex
 }
 
-func initializeFirebaseAuth() {
-	Context = context.Background()
-	var err error
-
-	firebaseApp, err := firebase.NewApp(
-		Context,
-		nil,
-		option.WithCredentialsFile("click-utah-d7eaac9e6640.json"),
-	)
-
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	AuthClient, err = firebaseApp.Auth(Context)
-
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	log.Println("Initialized Firebase Auth")
-}
-
-func handleTime(responseWriter http.ResponseWriter, request *http.Request) {
-	timeBytes, err := json.Marshal(TimeInfo{
-		Time: time.Now().UTC().Add(time.Hour * 9).Format(time.DateTime),
-	})
-
-	if err != nil {
-		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	responseWriter.Header().Add("Access-Control-Allow-Origin", "*")
-	responseWriter.Header().Add("Content-Type", "application/json")
-	_, err = responseWriter.Write(timeBytes)
-
-	if err != nil {
-		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
-		return
-	}
-}
-
 func handleSignUp(responseWriter http.ResponseWriter, request *http.Request) {
-	var signUpInfo SignUpInfo
-	err := json.NewDecoder(request.Body).Decode(&signUpInfo)
+	function := "handleSignUp"
+
+	var signUpJson SignUpJson
+	err := json.NewDecoder(request.Body).Decode(&signUpJson)
 
 	if err != nil {
-		http.Error(responseWriter, err.Error(), http.StatusBadRequest)
+		handleError(responseWriter, "4", function, "Decode(&signUpJson)", "Request body is invalid")
 		return
 	}
 
-	email := signUpInfo.Email
-	password := signUpInfo.Password
-	name := signUpInfo.Name
+	email := signUpJson.Email
+	password := signUpJson.Password
+	name := signUpJson.Name
 
 	if email == "" || password == "" || name == "" {
-		http.Error(responseWriter, "Missing email, password, and/or name", http.StatusBadRequest)
+		handleError(responseWriter, "4", function, "email == '' || password == '' || name == ''",
+			"Email, password, or name is empty")
+
 		return
 	}
 
-	if !strings.HasSuffix(email, "utah.edu") {
-		http.Error(responseWriter, "Invalid email domain", http.StatusBadRequest)
+	uid, domain, found := strings.Cut(email, "@")
+
+	if !found || uid == "" {
+		handleError(responseWriter, "4", function, "!found || uid == ''", "Email is invalid")
 		return
 	}
 
-	userRecord, err := AuthClient.CreateUser(
-		Context,
-		(&auth.UserToCreate{}).Email(email).Password(password),
-	)
+	if !strings.HasSuffix(domain, "utah.edu") {
+		handleError(responseWriter, "4", function, "!strings.HasSuffix(domain, 'utah.edu')",
+			"Email does not end with utah.edu")
 
-	if err != nil {
-		errString := err.Error()
-		_, after, found := strings.Cut(errString, "body: ")
-
-		if !found {
-			http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		var firebaseInfo FirebaseInfo
-		err := json.Unmarshal([]byte(after), &firebaseInfo)
-
-		if err != nil {
-			http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
-		}
-
-		firebaseError := firebaseInfo.Error
-		http.Error(responseWriter, firebaseError.Message, firebaseError.Code)
 		return
 	}
 
-	userBytes, err := json.Marshal(UserInfo{
+	fileName := "./data/" + uid + ".json"
+	mutex := getMutex(fileName)
+	mutex.Lock()
+	defer mutex.Unlock()
+	dataBytes, err := os.ReadFile(fileName)
+
+	if err == nil {
+		handleError(responseWriter, "4", function, "ReadFile(fileName)", "User already exists")
+		return
+	}
+
+	dataJson := DataJson{
+		Email:     email,
+		Password:  password,
 		Name:      name,
+		Uid:       uid,
 		Count:     0,
 		Timestamp: time.Now().UnixMicro(),
+	}
+
+	dataBytes, err = json.Marshal(dataJson)
+
+	if err != nil {
+		handleError(responseWriter, "5", function, "Marshal(dataJson)", "")
+		return
+	}
+
+	err = os.WriteFile(fileName, dataBytes, 0600)
+
+	if err != nil {
+		handleError(responseWriter, "5", function, "WriteFile(fileName, dataBytes, 0600)", "")
+		return
+	}
+
+	userBytes, err := json.Marshal(UserJson{
+		Error: false,
+		Email: dataJson.Email,
+		Name:  dataJson.Name,
+		Uid:   dataJson.Uid,
+		Count: dataJson.Count,
 	})
 
 	if err != nil {
-		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	uid := userRecord.UID
-	fileName := "./data/" + uid + ".json"
-	mutex := getMutex(fileName)
-	mutex.Lock()
-	defer mutex.Unlock()
-	err = os.WriteFile(fileName, userBytes, 0600)
-
-	if err != nil {
-		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	uidBytes, err := json.Marshal(UIDInfo{
-		UID: uid,
-	})
-
-	if err != nil {
-		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	responseWriter.Header().Add("Access-Control-Allow-Origin", "*")
-	responseWriter.Header().Add("Content-Type", "application/json")
-	_, err = responseWriter.Write(uidBytes)
-
-	if err != nil {
-		innerErr := AuthClient.DeleteUser(Context, uid)
-
-		if innerErr != nil {
-			errString := innerErr.Error()
-			_, after, found := strings.Cut(errString, "body: ")
-
-			if !found {
-				http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
-				return
-			}
-
-			var firebaseInfo FirebaseInfo
-			err := json.Unmarshal([]byte(after), &firebaseInfo)
-
-			if err != nil {
-				http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
-			}
-
-			firebaseError := firebaseInfo.Error
-			http.Error(responseWriter, firebaseError.Message, firebaseError.Code)
-			return
-		}
-
-		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
-		return
-	}
-}
-
-func handleUser(responseWriter http.ResponseWriter, request *http.Request) {
-	var uidInfo UIDInfo
-	err := json.NewDecoder(request.Body).Decode(&uidInfo)
-
-	if err != nil {
-		http.Error(responseWriter, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	uid := uidInfo.UID
-
-	if uid == "" {
-		http.Error(responseWriter, "Missing UID", http.StatusBadRequest)
-		return
-	}
-
-	fileName := "./data/" + uid + ".json"
-	mutex := getMutex(fileName)
-	mutex.Lock()
-	defer mutex.Unlock()
-	userBytes, err := os.ReadFile(fileName)
-
-	if err != nil {
-		http.Error(responseWriter, "Invalid UID", http.StatusBadRequest)
+		handleError(responseWriter, "5", function, "Marshal(UserJson)", "")
 		return
 	}
 
@@ -270,24 +223,45 @@ func handleUser(responseWriter http.ResponseWriter, request *http.Request) {
 	_, err = responseWriter.Write(userBytes)
 
 	if err != nil {
-		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
+		handleError(responseWriter, "5", function, "Write(userBytes)", "")
 		return
 	}
+
+	handleError(responseWriter, "2", function, "", "")
 }
 
-func handleClick(responseWriter http.ResponseWriter, request *http.Request) {
-	var uidInfo UIDInfo
-	err := json.NewDecoder(request.Body).Decode(&uidInfo)
+func handleSignIn(responseWriter http.ResponseWriter, request *http.Request) {
+	function := "handleSignIn"
+
+	var signInJson SignInJson
+	err := json.NewDecoder(request.Body).Decode(&signInJson)
 
 	if err != nil {
-		http.Error(responseWriter, err.Error(), http.StatusBadRequest)
+		handleError(responseWriter, "4", function, "Decode(&signInJson)", "Request body is invalid")
 		return
 	}
 
-	uid := uidInfo.UID
+	email := signInJson.Email
+	password := signInJson.Password
 
-	if uid == "" {
-		http.Error(responseWriter, "Missing UID", http.StatusBadRequest)
+	if email == "" || password == "" {
+		handleError(responseWriter, "4", function, "email == '' || password == ''",
+			"Email or password is empty")
+
+		return
+	}
+
+	uid, domain, found := strings.Cut(email, "@")
+
+	if !found || uid == "" {
+		handleError(responseWriter, "4", function, "!found || uid == ''", "Email is invalid")
+		return
+	}
+
+	if !strings.HasSuffix(domain, "utah.edu") {
+		handleError(responseWriter, "4", function, "!strings.HasSuffix(domain, 'utah.edu')",
+			"Email does not end with utah.edu")
+
 		return
 	}
 
@@ -295,70 +269,140 @@ func handleClick(responseWriter http.ResponseWriter, request *http.Request) {
 	mutex := getMutex(fileName)
 	mutex.Lock()
 	defer mutex.Unlock()
-	userBytes, err := os.ReadFile(fileName)
+	dataBytes, err := os.ReadFile(fileName)
 
 	if err != nil {
-		http.Error(responseWriter, "Invalid UID", http.StatusBadRequest)
+		handleError(responseWriter, "4", function, "ReadFile(fileName)", "User does not exist")
 		return
 	}
 
-	var userInfo UserInfo
-	err = json.Unmarshal(userBytes, &userInfo)
+	var dataJson DataJson
+	err = json.Unmarshal(dataBytes, &dataJson)
 
 	if err != nil {
-		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
+		handleError(responseWriter, "5", function, "Unmarshal(dataBytes, &dataJson)", "")
 		return
 	}
 
-	userInfo.Count++
-	userInfo.Timestamp = time.Now().UnixMicro()
-	userBytes, err = json.Marshal(userInfo)
+	// if email != dataJson.Email {
+	// 	handleError(responseWriter, "4", function, "email != dataJson.Email",
+	// 		"Email is incorrect")
+	//
+	// 	return
+	// }
 
-	if err != nil {
-		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
+	if password != dataJson.Password {
+		handleError(responseWriter, "4", function, "password != dataJson.Password",
+			"Password is incorrect")
+
 		return
 	}
 
-	err = os.WriteFile(fileName, userBytes, 0600)
-
-	if err != nil {
-		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	countBytes, err := json.Marshal(CountInfo{
-		Count: userInfo.Count,
+	userBytes, err := json.Marshal(UserJson{
+		Error: false,
+		Email: dataJson.Email,
+		Name:  dataJson.Name,
+		Uid:   dataJson.Uid,
+		Count: dataJson.Count,
 	})
 
 	if err != nil {
-		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
+		handleError(responseWriter, "5", function, "Marshal(UserJson)", "")
 		return
 	}
 
 	responseWriter.Header().Add("Access-Control-Allow-Origin", "*")
 	responseWriter.Header().Add("Content-Type", "application/json")
-	_, err = responseWriter.Write(countBytes)
+	_, err = responseWriter.Write(userBytes)
 
 	if err != nil {
-		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
+		handleError(responseWriter, "5", function, "Write(userBytes)", "")
 		return
 	}
+
+	handleError(responseWriter, "2", function, "", "")
+}
+
+func handleUser(responseWriter http.ResponseWriter, request *http.Request) {
+	function := "handleUser"
+
+	var uidJson UidJson
+	err := json.NewDecoder(request.Body).Decode(&uidJson)
+
+	if err != nil {
+		handleError(responseWriter, "4", function, "Decode(&uidJson)", "Request body is invalid")
+		return
+	}
+
+	uid := uidJson.Uid
+
+	if uid == "" {
+		handleError(responseWriter, "4", function, "uid == ''", "UID is empty")
+		return
+	}
+
+	fileName := "./data/" + uid + ".json"
+	mutex := getMutex(fileName)
+	mutex.Lock()
+	defer mutex.Unlock()
+	dataBytes, err := os.ReadFile(fileName)
+
+	if err != nil {
+		handleError(responseWriter, "4", function, "ReadFile(fileName)", "User does not exist")
+		return
+	}
+
+	var dataJson DataJson
+	err = json.Unmarshal(dataBytes, &dataJson)
+
+	if err != nil {
+		handleError(responseWriter, "5", function, "Unmarshal(dataBytes, &dataJson)", "")
+		return
+	}
+
+	userBytes, err := json.Marshal(UserJson{
+		Error: false,
+		Email: dataJson.Email,
+		Name:  dataJson.Name,
+		Uid:   dataJson.Uid,
+		Count: dataJson.Count,
+	})
+
+	if err != nil {
+		handleError(responseWriter, "5", function, "Marshal(UserJson)", "")
+		return
+	}
+
+	responseWriter.Header().Add("Access-Control-Allow-Origin", "*")
+	responseWriter.Header().Add("Content-Type", "application/json")
+	_, err = responseWriter.Write(userBytes)
+
+	if err != nil {
+		handleError(responseWriter, "5", function, "Write(userBytes)", "")
+		return
+	}
+
+	handleError(responseWriter, "2", function, "", "")
 }
 
 func handleRename(responseWriter http.ResponseWriter, request *http.Request) {
-	var renameInfo RenameInfo
-	err := json.NewDecoder(request.Body).Decode(&renameInfo)
+	function := "handleRename"
+
+	var renameJson RenameJson
+	err := json.NewDecoder(request.Body).Decode(&renameJson)
 
 	if err != nil {
-		http.Error(responseWriter, err.Error(), http.StatusBadRequest)
+		handleError(responseWriter, "4", function, "Decode(&renameJson)", "Request body is invalid")
 		return
 	}
 
-	uid := renameInfo.UID
-	name := renameInfo.Name
+	uid := renameJson.Uid
+	name := renameJson.Name
 
 	if uid == "" || name == "" {
-		http.Error(responseWriter, "Missing UID and/or name", http.StatusBadRequest)
+		handleError(responseWriter, "4", function, "uid == '' || name == ''",
+			"UID or name is empty")
+
 		return
 	}
 
@@ -366,63 +410,147 @@ func handleRename(responseWriter http.ResponseWriter, request *http.Request) {
 	mutex := getMutex(fileName)
 	mutex.Lock()
 	defer mutex.Unlock()
-	userBytes, err := os.ReadFile(fileName)
+	dataBytes, err := os.ReadFile(fileName)
 
 	if err != nil {
-		http.Error(responseWriter, "Invalid UID", http.StatusBadRequest)
+		handleError(responseWriter, "4", function, "ReadFile(fileName)", "User does not exist")
 		return
 	}
 
-	var userInfo UserInfo
-	err = json.Unmarshal(userBytes, &userInfo)
+	var dataJson DataJson
+	err = json.Unmarshal(dataBytes, &dataJson)
 
 	if err != nil {
-		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
+		handleError(responseWriter, "5", function, "Unmarshal(dataBytes, &dataJson)", "")
 		return
 	}
 
-	userInfo.Name = name
-	userBytes, err = json.Marshal(userInfo)
+	dataJson.Name = name
+	dataBytes, err = json.Marshal(dataJson)
 
 	if err != nil {
-		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
+		handleError(responseWriter, "5", function, "Marshal(dataJson)", "")
 		return
 	}
 
-	err = os.WriteFile(fileName, userBytes, 0600)
+	err = os.WriteFile(fileName, dataBytes, 0600)
 
 	if err != nil {
-		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
+		handleError(responseWriter, "5", function, "WriteFile(fileName, dataBytes, 0600)", "")
 		return
 	}
 
-	nameBytes, err := json.Marshal(NameInfo{
-		Name: name,
+	userBytes, err := json.Marshal(UserJson{
+		Error: false,
+		Email: dataJson.Email,
+		Name:  dataJson.Name,
+		Uid:   dataJson.Uid,
+		Count: dataJson.Count,
 	})
 
 	if err != nil {
-		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
+		handleError(responseWriter, "5", function, "Marshal(UserJson)", "")
 		return
 	}
 
 	responseWriter.Header().Add("Access-Control-Allow-Origin", "*")
 	responseWriter.Header().Add("Content-Type", "application/json")
-	_, err = responseWriter.Write(nameBytes)
+	_, err = responseWriter.Write(userBytes)
 
 	if err != nil {
-		http.Error(responseWriter, err.Error(), http.StatusInternalServerError)
+		handleError(responseWriter, "5", function, "Write(renameBytes)", "")
 		return
 	}
+
+	handleError(responseWriter, "2", function, "", "")
+}
+
+func handleClick(responseWriter http.ResponseWriter, request *http.Request) {
+	function := "handleClick"
+
+	var uidJson UidJson
+	err := json.NewDecoder(request.Body).Decode(&uidJson)
+
+	if err != nil {
+		handleError(responseWriter, "4", function, "Decode(&uidJson)", "Request body is invalid")
+		return
+	}
+
+	uid := uidJson.Uid
+
+	if uid == "" {
+		handleError(responseWriter, "4", function, "uid == ''", "UID is empty")
+		return
+	}
+
+	fileName := "./data/" + uid + ".json"
+	mutex := getMutex(fileName)
+	mutex.Lock()
+	defer mutex.Unlock()
+	dataBytes, err := os.ReadFile(fileName)
+
+	if err != nil {
+		handleError(responseWriter, "4", function, "ReadFile(fileName)", "User does not exist")
+		return
+	}
+
+	var dataJson DataJson
+	err = json.Unmarshal(dataBytes, &dataJson)
+
+	if err != nil {
+		handleError(responseWriter, "5", function, "Unmarshal(dataBytes, &dataJson)", "")
+		return
+	}
+
+	dataJson.Count++
+	dataJson.Timestamp = time.Now().UnixMicro()
+	dataBytes, err = json.Marshal(dataJson)
+
+	if err != nil {
+		handleError(responseWriter, "5", function, "Marshal(dataJson)", "")
+		return
+	}
+
+	err = os.WriteFile(fileName, dataBytes, 0600)
+
+	if err != nil {
+		handleError(responseWriter, "5", function, "WriteFile(fileName, dataBytes, 0600)", "")
+		return
+	}
+
+	userBytes, err := json.Marshal(UserJson{
+		Error: false,
+		Email: dataJson.Email,
+		Name:  dataJson.Name,
+		Uid:   dataJson.Uid,
+		Count: dataJson.Count,
+	})
+
+	if err != nil {
+		handleError(responseWriter, "5", function, "Marshal(UserJson)", "")
+		return
+	}
+
+	responseWriter.Header().Add("Access-Control-Allow-Origin", "*")
+	responseWriter.Header().Add("Content-Type", "application/json")
+	_, err = responseWriter.Write(userBytes)
+
+	if err != nil {
+		handleError(responseWriter, "5", function, "Write(userBytes)", "")
+		return
+	}
+
+	handleError(responseWriter, "2", function, "", "")
 }
 
 func main() {
-	initializeFirebaseAuth()
-
 	http.HandleFunc("/time", handleTime)
 	http.HandleFunc("/signup", handleSignUp)
+	http.HandleFunc("/signin", handleSignIn)
 	http.HandleFunc("/user", handleUser)
-	http.HandleFunc("/click", handleClick)
 	http.HandleFunc("/rename", handleRename)
+	http.HandleFunc("/click", handleClick)
 
+	log.Println("Listening on port 80")
 	log.Fatalln(http.ListenAndServe(":80", nil))
 }
