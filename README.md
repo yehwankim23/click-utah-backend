@@ -47,12 +47,14 @@ Response
 - `string` name : Name
 - `string` uid : UID
 - `number` count : Click count
+- `nunmber` token : Token
 
 ### /user
 
 Request body
 
 - `string` uid : UID
+- `nunmber` token : Token
 
 Response
 
@@ -68,6 +70,7 @@ Request body
 
 - `string` uid : UID
 - `string` name : Name
+- `nunmber` token : Token
 
 Response
 
@@ -82,6 +85,7 @@ Response
 Request body
 
 - `string` uid : UID
+- `nunmber` token : Token
 
 Response
 

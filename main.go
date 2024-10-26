@@ -20,17 +20,22 @@ type ErrorJson struct {
 	Message string `json:"message"`
 }
 
-type LeaderboardJson struct {
-	Error       bool                  `json:"error"`
-	Leaderboard []LeaderboardItemJson `json:"leaderboard"`
-}
-
 type LeaderboardItemJson struct {
 	Email     string `json:"email"`
 	Name      string `json:"name"`
 	Uid       string `json:"uid"`
 	Count     int    `json:"count"`
 	Timestamp int64  `json:"timestamp"`
+}
+
+type DataJson struct {
+	Email     string `json:"email"`
+	Password  string `json:"password"`
+	Name      string `json:"name"`
+	Uid       string `json:"uid"`
+	Count     int    `json:"count"`
+	Timestamp int64  `json:"timestamp"`
+	Token     int64  `json:"token"`
 }
 
 type TimeJson struct {
@@ -44,24 +49,6 @@ type SignUpJson struct {
 	Name     string `json:"name"`
 }
 
-type DataJson struct {
-	Email     string `json:"email"`
-	Password  string `json:"password"`
-	Name      string `json:"name"`
-	Uid       string `json:"uid"`
-	Count     int    `json:"count"`
-	Timestamp int64  `json:"timestamp"`
-}
-
-type UidJson struct {
-	Uid string `json:"uid"`
-}
-
-type SignInJson struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
-}
-
 type UserJson struct {
 	Error bool   `json:"error"`
 	Email string `json:"email"`
@@ -70,9 +57,34 @@ type UserJson struct {
 	Count int    `json:"count"`
 }
 
+type SignInJson struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+type TokenJson struct {
+	Error bool   `json:"error"`
+	Email string `json:"email"`
+	Name  string `json:"name"`
+	Uid   string `json:"uid"`
+	Count int    `json:"count"`
+	Token int64  `json:"token"`
+}
+
+type UidJson struct {
+	Uid   string `json:"uid"`
+	Token int64  `json:"token"`
+}
+
 type RenameJson struct {
-	Uid  string `json:"uid"`
-	Name string `json:"name"`
+	Uid   string `json:"uid"`
+	Name  string `json:"name"`
+	Token int64  `json:"token"`
+}
+
+type LeaderboardJson struct {
+	Error       bool                  `json:"error"`
+	Leaderboard []LeaderboardItemJson `json:"leaderboard"`
 }
 
 func logError(level string, function string, code string, message string) {
@@ -194,7 +206,7 @@ func handleTime(responseWriter http.ResponseWriter, request *http.Request) {
 
 	timeBytes, err := json.Marshal(TimeJson{
 		Time:    time.Now().UTC().Add(time.Hour * 9).Format(time.DateTime),
-		Version: "2024.10.25.2",
+		Version: "2024.10.27.0",
 	})
 
 	if err != nil {
@@ -268,6 +280,7 @@ func handleSignUp(responseWriter http.ResponseWriter, request *http.Request) {
 		Uid:       uid,
 		Count:     0,
 		Timestamp: time.Now().UnixMicro(),
+		Token:     0,
 	}
 
 	dataBytes, err = json.Marshal(dataJson)
@@ -372,8 +385,7 @@ func handleSignIn(responseWriter http.ResponseWriter, request *http.Request) {
 	}
 
 	// if email != dataJson.Email {
-	// 	handleError(responseWriter, "4", function, "email != dataJson.Email",
-	// 		"Email is incorrect")
+	// 	handleError(responseWriter, "4", function, "email != dataJson.Email", "Email is incorrect")
 	//
 	// 	return
 	// }
@@ -385,12 +397,23 @@ func handleSignIn(responseWriter http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	userBytes, err := json.Marshal(UserJson{
+	dataJson.Token = time.Now().UnixMicro()
+	dataBytes, err = json.Marshal(dataJson)
+
+	if err != nil {
+		handleError(responseWriter, "5", function, "Marshal(dataJson)", "")
+		return
+	}
+
+	err = os.WriteFile(fileName, dataBytes, 0600)
+
+	userBytes, err := json.Marshal(TokenJson{
 		Error: false,
 		Email: dataJson.Email,
 		Name:  dataJson.Name,
 		Uid:   dataJson.Uid,
 		Count: dataJson.Count,
+		Token: dataJson.Token,
 	})
 
 	if err != nil {
@@ -422,9 +445,12 @@ func handleUser(responseWriter http.ResponseWriter, request *http.Request) {
 	}
 
 	uid := uidJson.Uid
+	token := uidJson.Token
 
-	if uid == "" {
-		handleError(responseWriter, "4", function, "uid == ''", "UID is empty")
+	if uid == "" || token == 0 {
+		handleError(responseWriter, "4", function, "uid == '' || token == 0",
+			"UID or token is empty")
+
 		return
 	}
 
@@ -444,6 +470,11 @@ func handleUser(responseWriter http.ResponseWriter, request *http.Request) {
 
 	if err != nil {
 		handleError(responseWriter, "5", function, "Unmarshal(dataBytes, &dataJson)", "")
+		return
+	}
+
+	if token != dataJson.Token {
+		handleError(responseWriter, "4", function, "token != dataJson.Token", "Token is invalid")
 		return
 	}
 
@@ -485,10 +516,11 @@ func handleRename(responseWriter http.ResponseWriter, request *http.Request) {
 
 	uid := renameJson.Uid
 	name := renameJson.Name
+	token := renameJson.Token
 
-	if uid == "" || name == "" {
-		handleError(responseWriter, "4", function, "uid == '' || name == ''",
-			"UID or name is empty")
+	if uid == "" || name == "" || token == 0 {
+		handleError(responseWriter, "4", function, "uid == '' || name == '' || token == 0",
+			"UID, name, or token is empty")
 
 		return
 	}
@@ -509,6 +541,11 @@ func handleRename(responseWriter http.ResponseWriter, request *http.Request) {
 
 	if err != nil {
 		handleError(responseWriter, "5", function, "Unmarshal(dataBytes, &dataJson)", "")
+		return
+	}
+
+	if token != dataJson.Token {
+		handleError(responseWriter, "4", function, "token != dataJson.Token", "Token is invalid")
 		return
 	}
 
@@ -572,9 +609,12 @@ func handleClick(responseWriter http.ResponseWriter, request *http.Request) {
 	}
 
 	uid := uidJson.Uid
+	token := uidJson.Token
 
-	if uid == "" {
-		handleError(responseWriter, "4", function, "uid == ''", "UID is empty")
+	if uid == "" || token == 0 {
+		handleError(responseWriter, "4", function, "uid == '' || token == 0",
+			"UID or token is empty")
+
 		return
 	}
 
@@ -594,6 +634,11 @@ func handleClick(responseWriter http.ResponseWriter, request *http.Request) {
 
 	if err != nil {
 		handleError(responseWriter, "5", function, "Unmarshal(dataBytes, &dataJson)", "")
+		return
+	}
+
+	if token != dataJson.Token {
+		handleError(responseWriter, "4", function, "token != dataJson.Token", "Token is invalid")
 		return
 	}
 
