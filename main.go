@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-var Mutexes = make(map[string]*sync.Mutex)
+var mutexes = make(map[string]*sync.Mutex)
 var leaderboard []LeaderboardItemJson
 
 type ErrorJson struct {
@@ -95,6 +95,8 @@ func handleError(responseWriter http.ResponseWriter, level string, function stri
 	message string) {
 	logError(level, function, code, message)
 
+	function = "handleError"
+
 	if level != "4" {
 		return
 	}
@@ -105,7 +107,7 @@ func handleError(responseWriter http.ResponseWriter, level string, function stri
 	})
 
 	if err != nil {
-		logError("5", "sendError", "Marshal(ErrorJson)", "")
+		logError("5", function, "Marshal(ErrorJson)", "")
 		return
 	}
 
@@ -114,22 +116,22 @@ func handleError(responseWriter http.ResponseWriter, level string, function stri
 	_, err = responseWriter.Write(errorBytes)
 
 	if err != nil {
-		logError("5", "sendError", "Write(errorBytes)", "")
+		logError("5", function, "Write(errorBytes)", "")
 		return
 	}
 
-	logError("2", "sendError", "", "")
+	logError("2", function, "", "")
 }
 
 func getMutex(fileName string) *sync.Mutex {
-	mutex, exists := Mutexes[fileName]
+	mutex, exists := mutexes[fileName]
 
 	if exists {
 		return mutex
 	}
 
 	mutex = &sync.Mutex{}
-	Mutexes[fileName] = mutex
+	mutexes[fileName] = mutex
 	return mutex
 }
 
@@ -158,10 +160,12 @@ func updateLeaderboard(leaderboardItemJson LeaderboardItemJson) {
 }
 
 func initializeLeaderboard() {
+	function := "initializeLeaderboard"
+
 	entries, err := os.ReadDir("./data")
 
 	if err != nil {
-		logError("5", "initializeLeaderboard", "ReadDir('./data')", err.Error())
+		logError("5", function, "ReadDir('./data')", err.Error())
 		os.Exit(1)
 	}
 
@@ -177,7 +181,7 @@ func initializeLeaderboard() {
 		dataBytes, err := os.ReadFile(fileName)
 
 		if err != nil {
-			logError("5", "initializeLeaderboard", "ReadFile(fileName)", err.Error())
+			logError("5", function, "ReadFile(fileName)", err.Error())
 			os.Exit(1)
 		}
 
@@ -185,7 +189,7 @@ func initializeLeaderboard() {
 		err = json.Unmarshal(dataBytes, &dataJson)
 
 		if err != nil {
-			logError("5", "initializeLeaderboard", "Unmarshal(dataBytes, &dataJson)", err.Error())
+			logError("5", function, "Unmarshal(dataBytes, &dataJson)", err.Error())
 			os.Exit(1)
 		}
 
@@ -198,7 +202,7 @@ func initializeLeaderboard() {
 		})
 	}
 
-	logError("2", "initializeLeaderboard", "", "")
+	logError("2", function, "", "")
 }
 
 func handleTime(responseWriter http.ResponseWriter, request *http.Request) {
@@ -206,7 +210,7 @@ func handleTime(responseWriter http.ResponseWriter, request *http.Request) {
 
 	timeBytes, err := json.Marshal(TimeJson{
 		Time:    time.Now().UTC().Add(time.Hour * 9).Format(time.DateTime),
-		Version: "2024.10.27.0",
+		Version: "2025.1.17.0",
 	})
 
 	if err != nil {
