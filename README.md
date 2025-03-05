@@ -99,7 +99,8 @@ Response
 
 Request body
 
-- `none`
+- `string` uid : UID
+- `nunmber` token : Token
 
 Response
 

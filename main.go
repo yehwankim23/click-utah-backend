@@ -210,7 +210,7 @@ func handleTime(responseWriter http.ResponseWriter, request *http.Request) {
 
 	timeBytes, err := json.Marshal(TimeJson{
 		Time:    time.Now().UTC().Add(time.Hour * 9).Format(time.DateTime),
-		Version: "2025.1.17.0",
+		Version: "2025.3.5.0",
 	})
 
 	if err != nil {
@@ -698,13 +698,82 @@ func handleClick(responseWriter http.ResponseWriter, request *http.Request) {
 func handleLeaderboard(responseWriter http.ResponseWriter, request *http.Request) {
 	function := "handleLeaderboard"
 
-	mutex := getMutex("leaderboard")
+	var uidJson UidJson
+	err := json.NewDecoder(request.Body).Decode(&uidJson)
+
+	if err != nil {
+		handleError(responseWriter, "4", function, "Decode(&uidJson)", "Request body is invalid")
+		return
+	}
+
+	uid := uidJson.Uid
+	token := uidJson.Token
+
+	if uid == "" || token == 0 {
+		handleError(responseWriter, "4", function, "uid == '' || token == 0",
+			"UID or token is empty")
+
+		return
+	}
+
+	fileName := "./data/" + uid + ".json"
+	mutex := getMutex(fileName)
+	mutex.Lock()
+	dataBytes, err := os.ReadFile(fileName)
+
+	if err != nil {
+		handleError(responseWriter, "4", function, "ReadFile(fileName)", "User does not exist")
+		return
+	}
+
+	var dataJson DataJson
+	err = json.Unmarshal(dataBytes, &dataJson)
+
+	if err != nil {
+		handleError(responseWriter, "5", function, "Unmarshal(dataBytes, &dataJson)", "")
+		return
+	}
+
+	if token != dataJson.Token {
+		handleError(responseWriter, "4", function, "token != dataJson.Token", "Token is invalid")
+		return
+	}
+
+	leaderboardItemJson := LeaderboardItemJson{
+		Email:     dataJson.Email,
+		Name:      dataJson.Name,
+		Uid:       dataJson.Uid,
+		Count:     dataJson.Count,
+		Timestamp: dataJson.Timestamp,
+	}
+
+	mutex.Unlock()
+	mutex = getMutex("leaderboard")
 	mutex.Lock()
 	defer mutex.Unlock()
 
+	var tempLeaderboard []LeaderboardItemJson
+	contains := false
+
+	for _, item := range leaderboard {
+		tempLeaderboard = append(tempLeaderboard, item)
+
+		if item.Uid == leaderboardItemJson.Uid {
+			contains = true
+		}
+	}
+
+	if !contains {
+		if len(tempLeaderboard) == 10 {
+			tempLeaderboard = tempLeaderboard[:9]
+		}
+
+		tempLeaderboard = append(tempLeaderboard, leaderboardItemJson)
+	}
+
 	leaderboardBytes, err := json.Marshal(LeaderboardJson{
 		Error:       false,
-		Leaderboard: leaderboard,
+		Leaderboard: tempLeaderboard,
 	})
 
 	if err != nil {
