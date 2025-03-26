@@ -4,9 +4,9 @@ API that manages Click Utah's authentication and database
 
 ## API Endpoints
 
-Base URL : `http://click-utah-backend.140.238.11.223.sslip.io`
+Base URL : `https://click-utah-backend.yehwan.kim`
 
-### /time
+### `/time`
 
 Request body
 
@@ -17,7 +17,7 @@ Response
 - `string` time : Server time
 - `stirng` version : API version
 
-### /signup
+### `/signup`
 
 Request body
 
@@ -33,7 +33,7 @@ Response
 - `string` uid : UID
 - `number` count : Click count
 
-### /signin
+### `/signin`
 
 Request body
 
@@ -49,7 +49,7 @@ Response
 - `number` count : Click count
 - `nunmber` token : Token
 
-### /user
+### `/user`
 
 Request body
 
@@ -64,7 +64,7 @@ Response
 - `string` uid : UID
 - `number` count : Click count
 
-### /rename
+### `/rename`
 
 Request body
 
@@ -80,7 +80,7 @@ Response
 - `string` uid : UID
 - `number` count : Click count
 
-### /click
+### `/click`
 
 Request body
 
@@ -95,7 +95,7 @@ Response
 - `string` uid : UID
 - `number` count : Click count
 
-### /leaderboard
+### `/leaderboard`
 
 Request body
 
