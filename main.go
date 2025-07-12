@@ -97,7 +97,7 @@ func handleError(responseWriter http.ResponseWriter, level string, function stri
 
 	function = "handleError"
 
-	if level != "4" {
+	if level != " 4" {
 		return
 	}
 
@@ -107,7 +107,7 @@ func handleError(responseWriter http.ResponseWriter, level string, function stri
 	})
 
 	if err != nil {
-		logError("5", function, "Marshal(ErrorJson)", "")
+		logError("  5", function, "Marshal(ErrorJson)", "")
 		return
 	}
 
@@ -116,7 +116,7 @@ func handleError(responseWriter http.ResponseWriter, level string, function stri
 	_, err = responseWriter.Write(errorBytes)
 
 	if err != nil {
-		logError("5", function, "Write(errorBytes)", "")
+		logError("  5", function, "Write(errorBytes)", "")
 		return
 	}
 
@@ -165,7 +165,7 @@ func initializeLeaderboard() {
 	entries, err := os.ReadDir("./data")
 
 	if err != nil {
-		logError("5", function, "ReadDir('./data')", err.Error())
+		logError("  5", function, "ReadDir('./data')", err.Error())
 		os.Exit(1)
 	}
 
@@ -181,7 +181,7 @@ func initializeLeaderboard() {
 		dataBytes, err := os.ReadFile(fileName)
 
 		if err != nil {
-			logError("5", function, "ReadFile(fileName)", err.Error())
+			logError("  5", function, "ReadFile(fileName)", err.Error())
 			os.Exit(1)
 		}
 
@@ -189,7 +189,7 @@ func initializeLeaderboard() {
 		err = json.Unmarshal(dataBytes, &dataJson)
 
 		if err != nil {
-			logError("5", function, "Unmarshal(dataBytes, &dataJson)", err.Error())
+			logError("  5", function, "Unmarshal(dataBytes, &dataJson)", err.Error())
 			os.Exit(1)
 		}
 
@@ -210,11 +210,11 @@ func handleTime(responseWriter http.ResponseWriter, request *http.Request) {
 
 	timeBytes, err := json.Marshal(TimeJson{
 		Time:    time.Now().UTC().Add(time.Hour * 9).Format(time.DateTime),
-		Version: "2025.3.5.0",
+		Version: "2025.7.11.0",
 	})
 
 	if err != nil {
-		handleError(responseWriter, "5", function, "Marshal(TimeJson)", "")
+		handleError(responseWriter, "  5", function, "Marshal(TimeJson)", "")
 		return
 	}
 
@@ -223,7 +223,7 @@ func handleTime(responseWriter http.ResponseWriter, request *http.Request) {
 	_, err = responseWriter.Write(timeBytes)
 
 	if err != nil {
-		handleError(responseWriter, "5", function, "Write(timeBytes)", "")
+		handleError(responseWriter, "  5", function, "Write(timeBytes)", "")
 		return
 	}
 
@@ -237,7 +237,7 @@ func handleSignUp(responseWriter http.ResponseWriter, request *http.Request) {
 	err := json.NewDecoder(request.Body).Decode(&signUpJson)
 
 	if err != nil {
-		handleError(responseWriter, "4", function, "Decode(&signUpJson)", "Request body is invalid")
+		handleError(responseWriter, " 4", function, "Decode(&signUpJson)", "Request body is invalid")
 		return
 	}
 
@@ -246,7 +246,7 @@ func handleSignUp(responseWriter http.ResponseWriter, request *http.Request) {
 	name := signUpJson.Name
 
 	if email == "" || password == "" || name == "" {
-		handleError(responseWriter, "4", function, "email == '' || password == '' || name == ''",
+		handleError(responseWriter, " 4", function, "email == '' || password == '' || name == ''",
 			"Email, password, or name is empty")
 
 		return
@@ -255,12 +255,12 @@ func handleSignUp(responseWriter http.ResponseWriter, request *http.Request) {
 	uid, domain, found := strings.Cut(email, "@")
 
 	if !found || uid == "" {
-		handleError(responseWriter, "4", function, "!found || uid == ''", "Email is invalid")
+		handleError(responseWriter, " 4", function, "!found || uid == ''", "Email is invalid")
 		return
 	}
 
 	if !strings.HasSuffix(domain, "utah.edu") {
-		handleError(responseWriter, "4", function, "!strings.HasSuffix(domain, 'utah.edu')",
+		handleError(responseWriter, " 4", function, "!strings.HasSuffix(domain, 'utah.edu')",
 			"Email does not end with utah.edu")
 
 		return
@@ -273,7 +273,7 @@ func handleSignUp(responseWriter http.ResponseWriter, request *http.Request) {
 	dataBytes, err := os.ReadFile(fileName)
 
 	if err == nil {
-		handleError(responseWriter, "4", function, "ReadFile(fileName)", "User already exists")
+		handleError(responseWriter, " 4", function, "ReadFile(fileName)", "User already exists")
 		return
 	}
 
@@ -290,14 +290,14 @@ func handleSignUp(responseWriter http.ResponseWriter, request *http.Request) {
 	dataBytes, err = json.Marshal(dataJson)
 
 	if err != nil {
-		handleError(responseWriter, "5", function, "Marshal(dataJson)", "")
+		handleError(responseWriter, "  5", function, "Marshal(dataJson)", "")
 		return
 	}
 
 	err = os.WriteFile(fileName, dataBytes, 0600)
 
 	if err != nil {
-		handleError(responseWriter, "5", function, "WriteFile(fileName, dataBytes, 0600)", "")
+		handleError(responseWriter, "  5", function, "WriteFile(fileName, dataBytes, 0600)", "")
 		return
 	}
 
@@ -310,7 +310,7 @@ func handleSignUp(responseWriter http.ResponseWriter, request *http.Request) {
 	})
 
 	if err != nil {
-		handleError(responseWriter, "5", function, "Marshal(UserJson)", "")
+		handleError(responseWriter, "  5", function, "Marshal(UserJson)", "")
 		return
 	}
 
@@ -327,7 +327,7 @@ func handleSignUp(responseWriter http.ResponseWriter, request *http.Request) {
 	_, err = responseWriter.Write(userBytes)
 
 	if err != nil {
-		handleError(responseWriter, "5", function, "Write(userBytes)", "")
+		handleError(responseWriter, "  5", function, "Write(userBytes)", "")
 		return
 	}
 
@@ -341,7 +341,7 @@ func handleSignIn(responseWriter http.ResponseWriter, request *http.Request) {
 	err := json.NewDecoder(request.Body).Decode(&signInJson)
 
 	if err != nil {
-		handleError(responseWriter, "4", function, "Decode(&signInJson)", "Request body is invalid")
+		handleError(responseWriter, " 4", function, "Decode(&signInJson)", "Request body is invalid")
 		return
 	}
 
@@ -349,7 +349,7 @@ func handleSignIn(responseWriter http.ResponseWriter, request *http.Request) {
 	password := signInJson.Password
 
 	if email == "" || password == "" {
-		handleError(responseWriter, "4", function, "email == '' || password == ''",
+		handleError(responseWriter, " 4", function, "email == '' || password == ''",
 			"Email or password is empty")
 
 		return
@@ -358,12 +358,12 @@ func handleSignIn(responseWriter http.ResponseWriter, request *http.Request) {
 	uid, domain, found := strings.Cut(email, "@")
 
 	if !found || uid == "" {
-		handleError(responseWriter, "4", function, "!found || uid == ''", "Email is invalid")
+		handleError(responseWriter, " 4", function, "!found || uid == ''", "Email is invalid")
 		return
 	}
 
 	if !strings.HasSuffix(domain, "utah.edu") {
-		handleError(responseWriter, "4", function, "!strings.HasSuffix(domain, 'utah.edu')",
+		handleError(responseWriter, " 4", function, "!strings.HasSuffix(domain, 'utah.edu')",
 			"Email does not end with utah.edu")
 
 		return
@@ -376,7 +376,7 @@ func handleSignIn(responseWriter http.ResponseWriter, request *http.Request) {
 	dataBytes, err := os.ReadFile(fileName)
 
 	if err != nil {
-		handleError(responseWriter, "4", function, "ReadFile(fileName)", "User does not exist")
+		handleError(responseWriter, " 4", function, "ReadFile(fileName)", "User does not exist")
 		return
 	}
 
@@ -384,18 +384,18 @@ func handleSignIn(responseWriter http.ResponseWriter, request *http.Request) {
 	err = json.Unmarshal(dataBytes, &dataJson)
 
 	if err != nil {
-		handleError(responseWriter, "5", function, "Unmarshal(dataBytes, &dataJson)", "")
+		handleError(responseWriter, "  5", function, "Unmarshal(dataBytes, &dataJson)", "")
 		return
 	}
 
 	// if email != dataJson.Email {
-	// 	handleError(responseWriter, "4", function, "email != dataJson.Email", "Email is incorrect")
+	// 	handleError(responseWriter, " 4", function, "email != dataJson.Email", "Email is incorrect")
 	//
 	// 	return
 	// }
 
 	if password != dataJson.Password {
-		handleError(responseWriter, "4", function, "password != dataJson.Password",
+		handleError(responseWriter, " 4", function, "password != dataJson.Password",
 			"Password is incorrect")
 
 		return
@@ -405,11 +405,16 @@ func handleSignIn(responseWriter http.ResponseWriter, request *http.Request) {
 	dataBytes, err = json.Marshal(dataJson)
 
 	if err != nil {
-		handleError(responseWriter, "5", function, "Marshal(dataJson)", "")
+		handleError(responseWriter, "  5", function, "Marshal(dataJson)", "")
 		return
 	}
 
 	err = os.WriteFile(fileName, dataBytes, 0600)
+
+	if err != nil {
+		handleError(responseWriter, "  5", function, "WriteFile(fileName, dataBytes, 0600)", "")
+		return
+	}
 
 	userBytes, err := json.Marshal(TokenJson{
 		Error: false,
@@ -421,7 +426,7 @@ func handleSignIn(responseWriter http.ResponseWriter, request *http.Request) {
 	})
 
 	if err != nil {
-		handleError(responseWriter, "5", function, "Marshal(UserJson)", "")
+		handleError(responseWriter, "  5", function, "Marshal(UserJson)", "")
 		return
 	}
 
@@ -430,7 +435,7 @@ func handleSignIn(responseWriter http.ResponseWriter, request *http.Request) {
 	_, err = responseWriter.Write(userBytes)
 
 	if err != nil {
-		handleError(responseWriter, "5", function, "Write(userBytes)", "")
+		handleError(responseWriter, "  5", function, "Write(userBytes)", "")
 		return
 	}
 
@@ -444,7 +449,7 @@ func handleUser(responseWriter http.ResponseWriter, request *http.Request) {
 	err := json.NewDecoder(request.Body).Decode(&uidJson)
 
 	if err != nil {
-		handleError(responseWriter, "4", function, "Decode(&uidJson)", "Request body is invalid")
+		handleError(responseWriter, " 4", function, "Decode(&uidJson)", "Request body is invalid")
 		return
 	}
 
@@ -452,7 +457,7 @@ func handleUser(responseWriter http.ResponseWriter, request *http.Request) {
 	token := uidJson.Token
 
 	if uid == "" || token == 0 {
-		handleError(responseWriter, "4", function, "uid == '' || token == 0",
+		handleError(responseWriter, " 4", function, "uid == '' || token == 0",
 			"UID or token is empty")
 
 		return
@@ -465,7 +470,7 @@ func handleUser(responseWriter http.ResponseWriter, request *http.Request) {
 	dataBytes, err := os.ReadFile(fileName)
 
 	if err != nil {
-		handleError(responseWriter, "4", function, "ReadFile(fileName)", "User does not exist")
+		handleError(responseWriter, " 4", function, "ReadFile(fileName)", "User does not exist")
 		return
 	}
 
@@ -473,12 +478,12 @@ func handleUser(responseWriter http.ResponseWriter, request *http.Request) {
 	err = json.Unmarshal(dataBytes, &dataJson)
 
 	if err != nil {
-		handleError(responseWriter, "5", function, "Unmarshal(dataBytes, &dataJson)", "")
+		handleError(responseWriter, "  5", function, "Unmarshal(dataBytes, &dataJson)", "")
 		return
 	}
 
 	if token != dataJson.Token {
-		handleError(responseWriter, "4", function, "token != dataJson.Token", "Token is invalid")
+		handleError(responseWriter, " 4", function, "token != dataJson.Token", "Token is invalid")
 		return
 	}
 
@@ -491,7 +496,7 @@ func handleUser(responseWriter http.ResponseWriter, request *http.Request) {
 	})
 
 	if err != nil {
-		handleError(responseWriter, "5", function, "Marshal(UserJson)", "")
+		handleError(responseWriter, "  5", function, "Marshal(UserJson)", "")
 		return
 	}
 
@@ -500,7 +505,7 @@ func handleUser(responseWriter http.ResponseWriter, request *http.Request) {
 	_, err = responseWriter.Write(userBytes)
 
 	if err != nil {
-		handleError(responseWriter, "5", function, "Write(userBytes)", "")
+		handleError(responseWriter, "  5", function, "Write(userBytes)", "")
 		return
 	}
 
@@ -514,7 +519,7 @@ func handleRename(responseWriter http.ResponseWriter, request *http.Request) {
 	err := json.NewDecoder(request.Body).Decode(&renameJson)
 
 	if err != nil {
-		handleError(responseWriter, "4", function, "Decode(&renameJson)", "Request body is invalid")
+		handleError(responseWriter, " 4", function, "Decode(&renameJson)", "Request body is invalid")
 		return
 	}
 
@@ -523,7 +528,7 @@ func handleRename(responseWriter http.ResponseWriter, request *http.Request) {
 	token := renameJson.Token
 
 	if uid == "" || name == "" || token == 0 {
-		handleError(responseWriter, "4", function, "uid == '' || name == '' || token == 0",
+		handleError(responseWriter, " 4", function, "uid == '' || name == '' || token == 0",
 			"UID, name, or token is empty")
 
 		return
@@ -536,7 +541,7 @@ func handleRename(responseWriter http.ResponseWriter, request *http.Request) {
 	dataBytes, err := os.ReadFile(fileName)
 
 	if err != nil {
-		handleError(responseWriter, "4", function, "ReadFile(fileName)", "User does not exist")
+		handleError(responseWriter, " 4", function, "ReadFile(fileName)", "User does not exist")
 		return
 	}
 
@@ -544,12 +549,12 @@ func handleRename(responseWriter http.ResponseWriter, request *http.Request) {
 	err = json.Unmarshal(dataBytes, &dataJson)
 
 	if err != nil {
-		handleError(responseWriter, "5", function, "Unmarshal(dataBytes, &dataJson)", "")
+		handleError(responseWriter, "  5", function, "Unmarshal(dataBytes, &dataJson)", "")
 		return
 	}
 
 	if token != dataJson.Token {
-		handleError(responseWriter, "4", function, "token != dataJson.Token", "Token is invalid")
+		handleError(responseWriter, " 4", function, "token != dataJson.Token", "Token is invalid")
 		return
 	}
 
@@ -557,14 +562,14 @@ func handleRename(responseWriter http.ResponseWriter, request *http.Request) {
 	dataBytes, err = json.Marshal(dataJson)
 
 	if err != nil {
-		handleError(responseWriter, "5", function, "Marshal(dataJson)", "")
+		handleError(responseWriter, "  5", function, "Marshal(dataJson)", "")
 		return
 	}
 
 	err = os.WriteFile(fileName, dataBytes, 0600)
 
 	if err != nil {
-		handleError(responseWriter, "5", function, "WriteFile(fileName, dataBytes, 0600)", "")
+		handleError(responseWriter, "  5", function, "WriteFile(fileName, dataBytes, 0600)", "")
 		return
 	}
 
@@ -577,7 +582,7 @@ func handleRename(responseWriter http.ResponseWriter, request *http.Request) {
 	})
 
 	if err != nil {
-		handleError(responseWriter, "5", function, "Marshal(UserJson)", "")
+		handleError(responseWriter, "  5", function, "Marshal(UserJson)", "")
 		return
 	}
 
@@ -594,7 +599,7 @@ func handleRename(responseWriter http.ResponseWriter, request *http.Request) {
 	_, err = responseWriter.Write(userBytes)
 
 	if err != nil {
-		handleError(responseWriter, "5", function, "Write(renameBytes)", "")
+		handleError(responseWriter, "  5", function, "Write(renameBytes)", "")
 		return
 	}
 
@@ -608,7 +613,7 @@ func handleClick(responseWriter http.ResponseWriter, request *http.Request) {
 	err := json.NewDecoder(request.Body).Decode(&uidJson)
 
 	if err != nil {
-		handleError(responseWriter, "4", function, "Decode(&uidJson)", "Request body is invalid")
+		handleError(responseWriter, " 4", function, "Decode(&uidJson)", "Request body is invalid")
 		return
 	}
 
@@ -616,7 +621,7 @@ func handleClick(responseWriter http.ResponseWriter, request *http.Request) {
 	token := uidJson.Token
 
 	if uid == "" || token == 0 {
-		handleError(responseWriter, "4", function, "uid == '' || token == 0",
+		handleError(responseWriter, " 4", function, "uid == '' || token == 0",
 			"UID or token is empty")
 
 		return
@@ -629,7 +634,7 @@ func handleClick(responseWriter http.ResponseWriter, request *http.Request) {
 	dataBytes, err := os.ReadFile(fileName)
 
 	if err != nil {
-		handleError(responseWriter, "4", function, "ReadFile(fileName)", "User does not exist")
+		handleError(responseWriter, " 4", function, "ReadFile(fileName)", "User does not exist")
 		return
 	}
 
@@ -637,12 +642,12 @@ func handleClick(responseWriter http.ResponseWriter, request *http.Request) {
 	err = json.Unmarshal(dataBytes, &dataJson)
 
 	if err != nil {
-		handleError(responseWriter, "5", function, "Unmarshal(dataBytes, &dataJson)", "")
+		handleError(responseWriter, "  5", function, "Unmarshal(dataBytes, &dataJson)", "")
 		return
 	}
 
 	if token != dataJson.Token {
-		handleError(responseWriter, "4", function, "token != dataJson.Token", "Token is invalid")
+		handleError(responseWriter, " 4", function, "token != dataJson.Token", "Token is invalid")
 		return
 	}
 
@@ -651,14 +656,14 @@ func handleClick(responseWriter http.ResponseWriter, request *http.Request) {
 	dataBytes, err = json.Marshal(dataJson)
 
 	if err != nil {
-		handleError(responseWriter, "5", function, "Marshal(dataJson)", "")
+		handleError(responseWriter, "  5", function, "Marshal(dataJson)", "")
 		return
 	}
 
 	err = os.WriteFile(fileName, dataBytes, 0600)
 
 	if err != nil {
-		handleError(responseWriter, "5", function, "WriteFile(fileName, dataBytes, 0600)", "")
+		handleError(responseWriter, "  5", function, "WriteFile(fileName, dataBytes, 0600)", "")
 		return
 	}
 
@@ -671,7 +676,7 @@ func handleClick(responseWriter http.ResponseWriter, request *http.Request) {
 	})
 
 	if err != nil {
-		handleError(responseWriter, "5", function, "Marshal(UserJson)", "")
+		handleError(responseWriter, "  5", function, "Marshal(UserJson)", "")
 		return
 	}
 
@@ -688,7 +693,7 @@ func handleClick(responseWriter http.ResponseWriter, request *http.Request) {
 	_, err = responseWriter.Write(userBytes)
 
 	if err != nil {
-		handleError(responseWriter, "5", function, "Write(userBytes)", "")
+		handleError(responseWriter, "  5", function, "Write(userBytes)", "")
 		return
 	}
 
@@ -702,7 +707,7 @@ func handleLeaderboard(responseWriter http.ResponseWriter, request *http.Request
 	err := json.NewDecoder(request.Body).Decode(&uidJson)
 
 	if err != nil {
-		handleError(responseWriter, "4", function, "Decode(&uidJson)", "Request body is invalid")
+		handleError(responseWriter, " 4", function, "Decode(&uidJson)", "Request body is invalid")
 		return
 	}
 
@@ -710,7 +715,7 @@ func handleLeaderboard(responseWriter http.ResponseWriter, request *http.Request
 	token := uidJson.Token
 
 	if uid == "" || token == 0 {
-		handleError(responseWriter, "4", function, "uid == '' || token == 0",
+		handleError(responseWriter, " 4", function, "uid == '' || token == 0",
 			"UID or token is empty")
 
 		return
@@ -722,7 +727,7 @@ func handleLeaderboard(responseWriter http.ResponseWriter, request *http.Request
 	dataBytes, err := os.ReadFile(fileName)
 
 	if err != nil {
-		handleError(responseWriter, "4", function, "ReadFile(fileName)", "User does not exist")
+		handleError(responseWriter, " 4", function, "ReadFile(fileName)", "User does not exist")
 		return
 	}
 
@@ -730,12 +735,12 @@ func handleLeaderboard(responseWriter http.ResponseWriter, request *http.Request
 	err = json.Unmarshal(dataBytes, &dataJson)
 
 	if err != nil {
-		handleError(responseWriter, "5", function, "Unmarshal(dataBytes, &dataJson)", "")
+		handleError(responseWriter, "  5", function, "Unmarshal(dataBytes, &dataJson)", "")
 		return
 	}
 
 	if token != dataJson.Token {
-		handleError(responseWriter, "4", function, "token != dataJson.Token", "Token is invalid")
+		handleError(responseWriter, " 4", function, "token != dataJson.Token", "Token is invalid")
 		return
 	}
 
@@ -777,7 +782,7 @@ func handleLeaderboard(responseWriter http.ResponseWriter, request *http.Request
 	})
 
 	if err != nil {
-		handleError(responseWriter, "5", function, "Marshal(LeaderboardJson)", "")
+		handleError(responseWriter, "  5", function, "Marshal(LeaderboardJson)", "")
 		return
 	}
 
@@ -786,7 +791,7 @@ func handleLeaderboard(responseWriter http.ResponseWriter, request *http.Request
 	_, err = responseWriter.Write(leaderboardBytes)
 
 	if err != nil {
-		handleError(responseWriter, "5", function, "Write(leaderboardBytes)", "")
+		handleError(responseWriter, "  5", function, "Write(leaderboardBytes)", "")
 		return
 	}
 

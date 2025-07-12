@@ -2,6 +2,15 @@
 
 API that manages Click Utah's authentication and database
 
+## Coolify
+
+### Persistent Storage
+
+Directory Mount
+
+- Source Directory : `/data/coolify/applications/*/data`
+- Destination Directory : `/app/data`
+
 ## API Endpoints
 
 Base URL : `https://click-utah-backend.yehwan.kim`
@@ -47,14 +56,14 @@ Response
 - `string` name : Name
 - `string` uid : UID
 - `number` count : Click count
-- `nunmber` token : Token
+- `number` token : Token
 
 ### `/user`
 
 Request body
 
 - `string` uid : UID
-- `nunmber` token : Token
+- `number` token : Token
 
 Response
 
@@ -70,7 +79,7 @@ Request body
 
 - `string` uid : UID
 - `string` name : Name
-- `nunmber` token : Token
+- `number` token : Token
 
 Response
 
@@ -85,7 +94,7 @@ Response
 Request body
 
 - `string` uid : UID
-- `nunmber` token : Token
+- `number` token : Token
 
 Response
 
@@ -100,7 +109,7 @@ Response
 Request body
 
 - `string` uid : UID
-- `nunmber` token : Token
+- `number` token : Token
 
 Response
 
